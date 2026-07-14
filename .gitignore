@@ -1,0 +1,12 @@
+# Build artifacts
+mymsh
+*.o
+*.out
+*.dSYM/
+
+# OS/editor files
+.DS_Store
+*~
+
+# Local academic export with personal metadata
+practica_minishell_DavidArevaloRey.pdf
