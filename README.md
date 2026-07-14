@@ -15,7 +15,7 @@ El proyecto nace como una practica academica, pero esta preparado para poder rev
   - `cd`
   - `umask`
   - `jobs`
-  - `fg`
+  - `fg [id]`
   - `exit`
 - Limpieza de procesos zombie con `waitpid` y `WNOHANG`.
 - Tratamiento de `SIGINT` para evitar cerrar la shell con `Ctrl+C`.
@@ -99,6 +99,7 @@ msh> ls -l | grep txt
 msh> cat entrada.txt > salida.txt
 msh> sleep 10 &
 msh> jobs
+msh> fg
 msh> fg 1
 msh> umask
 msh> exit

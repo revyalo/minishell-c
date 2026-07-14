@@ -20,14 +20,17 @@
 #define MAXJB 12
 
 typedef struct{
-	pid_t pid;
+	pid_t pids[MAXARG];
+	int n_pids;
 	char cmd[MAXLINES];
 	int active; //valor como booleano, para saber si este elemento esta ocupado
+	unsigned long orden;
 }tLista;
 
 tLista *listaJobs;
+unsigned long contadorJobs = 0;
 
-void insertar(pid_t pid, char *cmd);
+void insertar(pid_t *pids, int n_pids, char *cmd);
 
 void mycd(tcommand cmd); 
 
@@ -40,6 +43,8 @@ void myfg(tcommand cmd);
 void myexec(tline *line, char *cmd);
 
 void limpiarZombies();
+
+int buscarUltimoJob();
 
 
 
@@ -280,7 +285,7 @@ void myexec(tline *line, char *cmd){
 		}
 	}else{
 		printf("comando en background con PID: %d\n", pid); // si no no esperamos 
-		insertar(pid, cmd);
+		insertar(pids, line -> ncommands, cmd);
 
 	}
 
@@ -302,17 +307,22 @@ void myumask(tcommand cmd){
 	}
 }
 
-void insertar(pid_t pid, char *cmd){
-	int i;
+void insertar(pid_t *pids, int n_pids, char *cmd){
+	int i, j;
 	for(i = 0; i < MAXJB; i++){ //insercion de una lista, recorremos la lista
 		if(listaJobs[i].active == 0){  //verificamos si hay espacio vacio
-			listaJobs[i].pid = pid; //registramos todos los valores del cmd que hay
-			strcpy(listaJobs[i].cmd, cmd);
+			for(j = 0; j < n_pids && j < MAXARG; j++){
+				listaJobs[i].pids[j] = pids[j];
+			}
+			listaJobs[i].n_pids = j;
+			strncpy(listaJobs[i].cmd, cmd, MAXLINES - 1);
+			listaJobs[i].cmd[MAXLINES - 1] = '\0';
 			listaJobs[i].active = 1;
+			listaJobs[i].orden = ++contadorJobs;
 			return;
 		}
 	}
-	printf("lista full");
+	printf("lista full\n");
 
 }
 
@@ -327,20 +337,47 @@ void myjobs(){
 }
 
 void myfg(tcommand cmd){
-	int pos, status;
+	int pos, status, i;
+	char *fin;
+	long job;
 
-	if(cmd.argc == 1){ //si solo pone fg pedimos que especifique el id
-		fprintf(stderr, "Usar: fg <id del jobs>");
-		return;
+	if(cmd.argc == 1){ //si solo pone fg se trae el ultimo trabajo activo
+		pos = buscarUltimoJob();
+		if(pos < 0){
+			fprintf(stderr, "fg: no hay trabajos en background\n");
+			return;
+		}
+	}else{
+		job = strtol(cmd.argv[1], &fin, 10);
+		if(*fin != '\0' || job < 1 || job > MAXJB){
+			fprintf(stderr, "fg: identificador de trabajo no valido: %s\n", cmd.argv[1]);
+			return;
+		}
+		pos = (int)job - 1; //necesitamos el id
 	}
 
-	pos = atoi(cmd.argv[1]) - 1; //necesitamos el id 
 	if(pos < 0 || pos >= MAXJB || listaJobs[pos].active == 0){ //comprobamos si es valido
-		fprintf(stderr, "El trabajo no existe %d \t", pos + 1);
+		fprintf(stderr, "fg: el trabajo no existe: %d\n", pos + 1);
 		return;
 	}
 	printf("%s\n", listaJobs[pos].cmd); //imprimimos el nombre del command
-	waitpid(listaJobs[pos].pid, &status, 0); //bloqueamos hasta que terminamos con el proceso
+
+	for(i = 0; i < listaJobs[pos].n_pids; i++){
+		if(listaJobs[pos].pids[i] <= 0){
+			continue;
+		}
+		while(waitpid(listaJobs[pos].pids[i], &status, 0) < 0){
+			if(errno == EINTR){
+				continue;
+			}
+			if(errno != ECHILD){
+				perror("fg: waitpid");
+			}
+			break;
+		}
+		listaJobs[pos].pids[i] = 0;
+	}
+
 	listaJobs[pos].active = 0; //una vez que retorna lo devolvemos
 
 }
@@ -348,13 +385,42 @@ void myfg(tcommand cmd){
 void limpiarZombies(){
 	pid_t pid;
 	int status;
-	int i;
+	int i, j, activos;
 	while((pid = waitpid(-1, &status, WNOHANG)) > 0){//no se bloquea, si hay hijos terminados devuelve un pid y recorremos la lista y lo borramos
 		for(i = 0; i < MAXJB; i++){
-			if(listaJobs[i].active && listaJobs[i].pid == pid){
-				listaJobs[i].active = 0;
+			if(listaJobs[i].active){
+				for(j = 0; j < listaJobs[i].n_pids; j++){
+					if(listaJobs[i].pids[j] == pid){
+						listaJobs[i].pids[j] = 0;
+					}
+				}
+
+				activos = 0;
+				for(j = 0; j < listaJobs[i].n_pids; j++){
+					if(listaJobs[i].pids[j] > 0){
+						activos = 1;
+					}
+				}
+				if(!activos){
+					listaJobs[i].active = 0;
+				}
 			}
 		}
 	}
 }
 
+int buscarUltimoJob(){
+	int i, pos;
+	unsigned long ultimo;
+
+	pos = -1;
+	ultimo = 0;
+	for(i = 0; i < MAXJB; i++){
+		if(listaJobs[i].active && listaJobs[i].orden > ultimo){
+			ultimo = listaJobs[i].orden;
+			pos = i;
+		}
+	}
+
+	return pos;
+}
