@@ -1,16 +1,16 @@
 # Minishell en C
 
-Implementacion de una shell sencilla en C para practicar llamadas al sistema Unix/Linux, gestion de procesos, pipes, redirecciones, senales y permisos.
+Implementación de una shell sencilla en C para practicar llamadas al sistema Unix/Linux, gestión de procesos, pipes, redirecciones, señales y permisos.
 
-El proyecto nace como una practica academica, pero esta preparado para poder revisarse como proyecto de portfolio tecnico.
+El proyecto nace como una práctica académica y está organizado como proyecto de portfolio centrado en programación de sistemas.
 
 ## Funcionalidades
 
-- Ejecucion de comandos externos con `fork` y `execvp`.
+- Ejecución de comandos externos con `fork` y `execvp`.
 - Pipes entre varios comandos.
-- Redireccion de entrada, salida y error.
-- Ejecucion de procesos en background con `&`.
-- Gestion basica de trabajos con `jobs` y `fg`.
+- Redirección de entrada, salida y error.
+- Ejecución de procesos en background con `&`.
+- Gestión básica de trabajos con `jobs` y `fg`.
 - Comandos internos:
   - `cd`
   - `umask`
@@ -20,29 +20,32 @@ El proyecto nace como una practica academica, pero esta preparado para poder rev
 - Limpieza de procesos zombie con `waitpid` y `WNOHANG`.
 - Tratamiento de `SIGINT` para evitar cerrar la shell con `Ctrl+C`.
 
-## Relacion con ciberseguridad
+## Conceptos trabajados
 
-Aunque no es una herramienta ofensiva, este proyecto demuestra fundamentos importantes para ciberseguridad y administracion de sistemas:
+Este proyecto está orientado principalmente a programación de sistemas en entornos Unix/Linux:
 
-- Comprension de procesos en Unix/Linux.
+- Creación y control de procesos.
+- Uso de `fork`, `execvp` y `waitpid`.
 - Manejo de descriptores de fichero.
-- Permisos y mascaras con `umask`.
-- Comunicacion entre procesos mediante pipes.
-- Control de senales.
-- Ejecucion de programas desde una shell.
-- Gestion de errores al interactuar con el sistema operativo.
+- Comunicación entre procesos mediante pipes.
+- Redirección de entrada, salida y error.
+- Gestión de señales.
+- Procesos en foreground y background.
+- Gestión básica de trabajos.
+- Permisos y máscaras con `umask`.
+- Tratamiento de errores al interactuar con el sistema operativo.
 
-Estos conceptos son base para entender hardening, analisis de comportamiento de procesos, scripting seguro, sandboxes, privilegios y funcionamiento interno de herramientas de seguridad.
+En conjunto, la práctica ayuda a entender cómo una shell coordina procesos y recursos del sistema operativo a bajo nivel.
 
 ## Requisitos
 
 - Compilador C (`gcc` o `clang`).
-- Sistema compatible con alguna de las librerias `parser` incluidas.
+- Sistema compatible con alguna de las librerías `parser` incluidas.
 - Entorno Unix/Linux o macOS.
 
-El parser se distribuye como libreria estatica porque la practica original proporcionaba esa dependencia ya compilada.
+El parser se distribuye como librería estática porque la práctica original proporcionaba esa dependencia ya compilada.
 
-## Librerias de parser incluidas
+## Librerías de parser incluidas
 
 | Archivo | Plataforma esperada |
 | --- | --- |
@@ -51,9 +54,9 @@ El parser se distribuye como libreria estatica porque la practica original propo
 | `libparserARMLinux.a` | Linux ARM64 |
 | `libparserARMMac.a` | macOS ARM64 / Apple Silicon |
 
-Nota: este paquete no incluye una libreria `parser` para macOS x86_64/Intel. En ese caso hace falta conseguir una version compatible o compilar/probar el proyecto en Linux x86_64.
+Nota: este paquete no incluye una librería `parser` para macOS x86_64/Intel. En ese caso hace falta conseguir una versión compatible o compilar/probar el proyecto en Linux x86_64.
 
-## Compilacion
+## Compilación
 
 Usa:
 
@@ -61,15 +64,15 @@ Usa:
 make
 ```
 
-El `Makefile` detecta la plataforma y selecciona la libreria adecuada cuando existe una compatible.
+El `Makefile` detecta la plataforma y selecciona la librería adecuada cuando existe una compatible.
 
-Tambien se puede indicar una libreria manualmente:
+También se puede indicar una librería manualmente:
 
 ```bash
 make LIBPARSER=libparser_64.a
 ```
 
-Comandos utiles:
+Comandos útiles:
 
 ```bash
 make parser-info
@@ -84,7 +87,7 @@ Modo interactivo:
 ./mymsh
 ```
 
-Ejecutar una linea directamente:
+Ejecutar una línea directamente:
 
 ```bash
 ./mymsh "ls -l | wc -l"
@@ -122,4 +125,4 @@ msh> exit
 
 ## Estado
 
-Proyecto academico funcional con parser externo. El siguiente paso natural seria sustituir la libreria estatica por una implementacion propia del parser para que el repositorio sea completamente portable.
+Proyecto académico funcional con parser externo. El siguiente paso natural sería sustituir la librería estática por una implementación propia del parser para que el repositorio sea completamente portable.
