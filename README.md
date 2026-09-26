@@ -1,128 +1,105 @@
 # Minishell en C
 
-Implementación de una shell sencilla en C para practicar llamadas al sistema Unix/Linux, gestión de procesos, pipes, redirecciones, señales y permisos.
-
-El proyecto nace como una práctica académica y está organizado como proyecto de portfolio centrado en programación de sistemas.
+Shell Unix pequeña y portable escrita en C11. Implementa su propio lexer/parser, crea pipelines con procesos POSIX y mantiene los recursos del sistema bajo control explícito. Ya no depende de librerías binarias externas ni de una arquitectura concreta.
 
 ## Funcionalidades
 
-- Ejecución de comandos externos con `fork` y `execvp`.
-- Pipes entre varios comandos.
-- Redirección de entrada, salida y error.
-- Ejecución de procesos en background con `&`.
-- Gestión básica de trabajos con `jobs` y `fg`.
-- Comandos internos:
-  - `cd`
-  - `umask`
-  - `jobs`
-  - `fg [id]`
-  - `exit`
-- Limpieza de procesos zombie con `waitpid` y `WNOHANG`.
-- Tratamiento de `SIGINT` para evitar cerrar la shell con `Ctrl+C`.
+- Comandos externos resueltos mediante `PATH` y `execvp`.
+- Pipelines de longitud arbitraria con `|`.
+- Redirecciones `<`, `>`, `>>`, `2>` y `2>>`.
+- Comillas simples/dobles, escapes y expansión de `$VARIABLE`, `${VARIABLE}` y `$$`.
+- Procesos en segundo plano con `&`, listado con `jobs` y recuperación con `fg [id]`.
+- Built-ins `cd`, `pwd`, `umask`, `jobs`, `fg` y `exit [estado]`.
+- Gestión de `SIGINT` y `SIGQUIT`: la shell permanece viva y los procesos foreground reciben el comportamiento normal.
+- Recolección no bloqueante de hijos con `waitpid(..., WNOHANG)` para evitar zombies.
+- Modos interactivo, por `stdin` y de una sola orden.
 
-## Conceptos trabajados
+## Arquitectura
 
-Este proyecto está orientado principalmente a programación de sistemas en entornos Unix/Linux:
+```mermaid
+flowchart LR
+    A[Entrada] --> B[Lexer y parser]
+    B --> C{Built-in simple?}
+    C -- sí --> D[Ejecutar en la shell]
+    C -- no --> E[Crear pipes]
+    E --> F[fork por comando]
+    F --> G[dup2 y redirecciones]
+    G --> H[execvp]
+    F --> I{Foreground?}
+    I -- sí --> J[waitpid]
+    I -- no --> K[Tabla de jobs]
+    K --> L[Recolección WNOHANG]
+```
 
-- Creación y control de procesos.
-- Uso de `fork`, `execvp` y `waitpid`.
-- Manejo de descriptores de fichero.
-- Comunicación entre procesos mediante pipes.
-- Redirección de entrada, salida y error.
-- Gestión de señales.
-- Procesos en foreground y background.
-- Gestión básica de trabajos.
-- Permisos y máscaras con `umask`.
-- Tratamiento de errores al interactuar con el sistema operativo.
-
-En conjunto, la práctica ayuda a entender cómo una shell coordina procesos y recursos del sistema operativo a bajo nivel.
-
-## Requisitos
-
-- Compilador C (`gcc` o `clang`).
-- Sistema compatible con alguna de las librerías `parser` incluidas.
-- Entorno Unix/Linux o macOS.
-
-El parser se distribuye como librería estática porque la práctica original proporcionaba esa dependencia ya compilada.
-
-## Librerías de parser incluidas
-
-| Archivo | Plataforma esperada |
+| Módulo | Responsabilidad |
 | --- | --- |
-| `libparser.a` | Linux i386 / 32-bit |
-| `libparser_64.a` | Linux x86_64 |
-| `libparserARMLinux.a` | Linux ARM64 |
-| `libparserARMMac.a` | macOS ARM64 / Apple Silicon |
+| `parser.c` | Tokenización, comillas, expansión, validación de sintaxis y liberación del AST. |
+| `executor.c` | Built-ins, pipes, `fork`, grupos de procesos, redirecciones, `execvp`, jobs y esperas. |
+| `mymsh.c` | Bucle interactivo, señales y selección del modo de entrada. |
 
-Nota: este paquete no incluye una librería `parser` para macOS x86_64/Intel. En ese caso hace falta conseguir una versión compatible o compilar/probar el proyecto en Linux x86_64.
+Separar parsing y ejecución permite probar la sintaxis sin crear procesos y auditar la gestión de descriptores por separado.
 
 ## Compilación
 
-Usa:
+Con Make:
 
 ```bash
 make
 ```
 
-El `Makefile` detecta la plataforma y selecciona la librería adecuada cuando existe una compatible.
-
-También se puede indicar una librería manualmente:
+Con CMake:
 
 ```bash
-make LIBPARSER=libparser_64.a
-```
-
-Comandos útiles:
-
-```bash
-make parser-info
-make clean
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
 ```
 
 ## Uso
 
-Modo interactivo:
-
 ```bash
 ./mymsh
+./mymsh "printf 'hola\\n' | wc -l"
+printf 'pwd\ncd /tmp\npwd\nexit\n' | ./mymsh
 ```
 
-Ejecutar una línea directamente:
+Ejemplos interactivos:
 
-```bash
-./mymsh "ls -l | wc -l"
-```
-
-Ejemplos:
-
-```bash
-msh> pwd
-msh> cd /tmp
-msh> ls -l | grep txt
-msh> cat entrada.txt > salida.txt
+```console
+msh> cat entrada.txt | grep error >> errores.txt
 msh> sleep 10 &
+[1] 42137
 msh> jobs
-msh> fg
+[1] ejecutando  sleep 10 &
 msh> fg 1
-msh> umask
-msh> exit
+sleep 10 &
 ```
 
-## Estructura
+## Pruebas y análisis dinámico
 
-```text
-.
-|-- mymsh.c
-|-- parser.h
-|-- test.c
-|-- libparser.a
-|-- libparser_64.a
-|-- libparserARMLinux.a
-|-- libparserARMMac.a
-|-- Makefile
-`-- README.md
+```bash
+make test
+make sanitize
 ```
 
-## Estado
+Las pruebas unitarias validan el parser. Las pruebas de integración comparan pipelines sencillos con Bash y cubren comillas, variables, entrada, truncado, append, errores de sintaxis y persistencia de estado entre built-ins. GitHub Actions repite la compilación y las pruebas con GCC, AddressSanitizer/UndefinedBehaviorSanitizer y Valgrind con seguimiento de descriptores.
 
-Proyecto académico funcional con parser externo. El siguiente paso natural sería sustituir la librería estática por una implementación propia del parser para que el repositorio sea completamente portable.
+Para revisar descriptores y memoria en Linux:
+
+```bash
+valgrind --leak-check=full --track-fds=yes ./mymsh "printf 'a\\nb\\n' | wc -l"
+```
+
+## Procesos, descriptores y seguridad
+
+- Cada hijo hereda únicamente los descriptores necesarios; después de `dup2`, todos los extremos de pipe se cierran antes de `execvp`.
+- Los ficheros redirigidos se crean con modo `0666`, limitado por la `umask` del proceso; la shell no fuerza permisos más amplios.
+- Los argumentos se pasan como vector a `execvp`: no se reconstruye una orden para entregársela a otra shell, evitando una segunda interpretación inesperada.
+- Los procesos de un pipeline comparten grupo de procesos, lo que prepara una gestión coherente de señales y jobs.
+- Todos los hijos foreground se esperan y los background se recolectan periódicamente, evitando procesos zombie.
+- La entrada tiene límite explícito y el parser usa memoria dimensionada dinámicamente.
+
+Entender una shell resulta especialmente útil en seguridad Linux: hace visibles los límites entre procesos, el entorno heredado, la resolución de ejecutables mediante `PATH`, los permisos, las señales y el ciclo de vida de cada descriptor.
+
+## Alcance conocido
+
+No pretende sustituir Bash. No implementa globbing (`*.c`), heredocs, sustitución `$(...)`, operadores `&&`/`||`, alias ni job control completo con procesos detenidos y control del terminal. Los built-ins que modifican estado se ejecutan como órdenes simples, sin pipeline ni redirección.

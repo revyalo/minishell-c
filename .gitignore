@@ -3,6 +3,7 @@ mymsh
 *.o
 *.out
 *.dSYM/
+build/
 
 # OS/editor files
 .DS_Store
